@@ -53,29 +53,35 @@ unsigned long long get_usec()
 }
 
 void app_main() {
+
+    printf("\nSRP Version: %s\n\n", SRP_VERSION_STR);
     unsigned long long start, duration;
     unsigned long long inter_start, inter_duration;
     unsigned long long client_duration = 0, server_duration = 0;
-    
+
     const SRP_TYPE ng_type    = SRP_TYPE_3072;
     const SRP_CRYPTO_HASH_ALGORITHM alg = SRP_CRYPTO_HASH_ALGORITHM_SHA512;
-    
+
     const char *username = "alice";
     const char *password = "password123";
 
     const int niter = 2;
 
-    int retS, retC;
     int successes = 0, failures = 0;
 
-    start = get_usec();    
+    start = get_usec();
+    // It is imperative to initialize the SRP system first
     srp_init(crypto_seed, 128);
     for (int i = 0; i < niter; i++) {
+        int ret;
+        SRPContext *srp_server;
+        SRPContext *srp_client;
+
         printf("\nIteration: %d -------------------------------------------------------------------------------------------\n\n", i + 1);
 
         inter_start = get_usec();
-        SRPContext *srp_server = srp_new_server(ng_type, alg);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_new_server(ng_type, alg, &srp_server));
+        inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
         printf("Usec srp_new_server: %llu\n", inter_duration);
         srp_dump_context(srp_server, "srp_new_server");
@@ -83,8 +89,8 @@ void app_main() {
         printf("====================== M1: Client -> Server -- 'SRP Start Request'\n");
 
         inter_start = get_usec();
-        SRPContext *srp_client = srp_new_client(ng_type, alg);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_new_client(ng_type, alg, &srp_client));
+        inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
         printf("Usec srp_new_client: %llu\n", inter_duration);
         srp_dump_context(srp_client, "srp_new_client");
@@ -92,22 +98,22 @@ void app_main() {
         printf("====================== M2: Server -> Client -- 'SRP Start Response'\n");
 
         inter_start = get_usec();
-        srp_set_username(srp_server, username);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_set_username(srp_server, username));
+        inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
         printf("Usec server srp_set_username: %llu\n", inter_duration);
         srp_dump_context(srp_server, "srp_set_username");
-        
+
         inter_start = get_usec();
-        srp_set_auth_password(srp_server, (const unsigned char *)password, strlen(password));
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_set_auth_password(srp_server, (const unsigned char *)password, strlen(password)));
+        inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
         printf("Usec server srp_set_auth_password: %llu\n", inter_duration);
         srp_dump_context(srp_server, "srp_set_auth_password");
-        
+
         inter_start = get_usec();
-        srp_gen_pub(srp_server);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_gen_pub(srp_server));
+        inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
         printf("Usec server srp_gen_pub: %llu\n", inter_duration);
         srp_dump_context(srp_server, "srp_set_auth_password");
@@ -116,39 +122,39 @@ void app_main() {
 
         inter_start = get_usec();
         // This is safe because numbers are copied
-        srp_set_params(srp_client, NULL, NULL, srp_server->s);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_set_params(srp_client, NULL, NULL, srp_server->s));
+        inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
         printf("Usec client srp_set_params: %llu\n", inter_duration);
         srp_dump_context(srp_client, "srp_set_params");
-        
+
         inter_start = get_usec();
-        srp_gen_pub(srp_client);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_gen_pub(srp_client));
+        inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
         printf("Usec client srp_gen_pub: %llu\n", inter_duration);
         srp_dump_context(srp_client, "srp_gen_pub");
-        
+
         inter_start = get_usec();
         // Get the password from the user but here we know it already
-        srp_set_username(srp_client, username);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_set_username(srp_client, username));
+        inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
         printf("Usec client srp_set_username: %llu\n", inter_duration);
         srp_dump_context(srp_client, "srp_set_username");
-        
+
         inter_start = get_usec();
         // Get the password from the user but here we know it already
-        srp_set_auth_password(srp_client, (const unsigned char *)password, strlen(password));
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_set_auth_password(srp_client, (const unsigned char *)password, strlen(password)));
+        inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
         printf("Usec client srp_set_auth_password: %llu\n", inter_duration);
         srp_dump_context(srp_client, "srp_set_auth_password");
-        
+
         inter_start = get_usec();
         // Get the password from the user; the server sent its public key earlier
-        srp_compute_key(srp_client, srp_server->public_key);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_compute_key(srp_client, srp_server->public_key));
+        inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
         printf("Usec client srp_compute_key: %llu\n", inter_duration);
         srp_dump_context(srp_client, "srp_compute_key");
@@ -156,43 +162,52 @@ void app_main() {
         printf("====================== M4: Server -> Client -- 'SRP Verify Response'\n");
 
         inter_start = get_usec();
-        srp_compute_key(srp_server, srp_client->public_key);
-        inter_duration = get_usec() - inter_start;        
+        ESP32_SRP_CHK(srp_compute_key(srp_server, srp_client->public_key));
+        inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
         printf("Usec server srp_compute_key: %llu\n", inter_duration);
         srp_dump_context(srp_server, "srp_compute_key");
 
         inter_start = get_usec();
-        retS = srp_verify_key(srp_server, srp_client->M1);
-        inter_duration = get_usec() - inter_start;        
+        ret = srp_verify_key(srp_server, srp_client->M1);
+        inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
         printf("Usec server srp_compute_key: %llu\n", inter_duration);
         srp_dump_context(srp_server, "srp_compute_key");
 
-        if (retS) {
+        if (ret) {
             printf("!!!!!!!!!!!! Server failed to validate Client\n");
+            goto cleanup;
         }
 
         printf("====================== M5: Client -> Server -- 'Exchange Request'\n");
 
         inter_start = get_usec();
-        retC = srp_verify_key(srp_client, srp_server->M2);
-        inter_duration = get_usec() - inter_start;        
+        ret = srp_verify_key(srp_client, srp_server->M2);
+        inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
         printf("Usec client srp_compute_key: %llu\n", inter_duration);
         srp_dump_context(srp_client, "srp_compute_key");
 
-        if (retC) {
+        if (ret) {
             printf("!!!!!!!!!!!! Server failed to validate Client\n");
+            goto cleanup;
         }
 
-        if (retS || retC) failures++; else successes++;
+cleanup:
+        if (ret) {
+            failures++;
+        }
+        else {
+            successes++;
+            printf("Authentication successful\n");
+        }
         srp_free(srp_server);
         srp_free(srp_client);
     }
-    
+
     duration = get_usec() - start;
-    
+
     printf("uSec total: %llu\n", duration);
     printf("uSec total CPU: %llu (avg: %llu)\n", server_duration + client_duration, (server_duration + client_duration) / niter);
     printf("uSec server CPU: %llu (avg: %llu)\n", server_duration, server_duration / niter);

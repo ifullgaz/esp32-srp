@@ -49,11 +49,6 @@
 #define SHA256_DIGEST_LENGTH 32
 #define SHA512_DIGEST_LENGTH 64
 
-#define ESP32_SRP_CHK(f) \
-if (( ret = f ) != 0) { \
-    goto cleanup; \
-}
-
 typedef struct _NGStringPair {
     const char *n_hex;
     const char *g_hex;
@@ -319,15 +314,15 @@ static int srp_crypto_hash_length(SRP_CRYPTO_HASH_ALGORITHM alg) {
 *                                      SRP MPI                                         *
 ****************************************************************************************/
 
-static mbedtls_mpi *srp_mpi_new() {
-    mbedtls_mpi *i;
-    if ((i = (mbedtls_mpi *)malloc(sizeof(mbedtls_mpi)))) {
-        mbedtls_mpi_init(i);
+#define SRP_DECLARE_MPI(variable) \
+    mbedtls_mpi *variable=NULL;
+
+static int srp_mpi_new(mbedtls_mpi **i) {
+    if (!(*i = (mbedtls_mpi *)malloc(sizeof(mbedtls_mpi)))) {
+        return SRP_ERR_ALLOC_FAILED;
     }
-    else {
-        ESP_LOGD(TAG, "Could not allocate memory for new mpi\"");        
-    }
-    return i;
+    mbedtls_mpi_init(*i);
+    return SRP_ERR_OK;
 }
 
 static void srp_mpi_free(mbedtls_mpi *i) {
@@ -350,15 +345,12 @@ cleanup:
 *                                    SRP Context                                       *
 ****************************************************************************************/
 
-// TODO: error handling for no memory errors
 #define srp_context_set_mpi(srp_ctx, field, value) { \
-    mbedtls_mpi *tmp_n = srp_mpi_new(); \
-    if (!tmp_n) { \
-        goto cleanup; \
-    } \
+    SRP_DECLARE_MPI(tmp_n); \
+    ESP32_SRP_CHK(srp_mpi_new(&tmp_n)); \
     ESP32_SRP_CHK(mbedtls_mpi_copy(tmp_n, value)); \
-    srp_mpi_free(srp_ctx->field); \
-    srp_ctx->field = tmp_n; \
+    srp_mpi_free((srp_ctx)->field); \
+    (srp_ctx)->field = tmp_n; \
 }
 
 #define srp_context_set_str(srp_ctx, field, value) { \
@@ -366,13 +358,15 @@ cleanup:
     if (value) { \
         if (!(tmp_c = strdup(value))) { \
             ESP_LOGD(TAG, "Could not duplicate string string \"%s\"", value); \
+            ret = SRP_ERR_ALLOC_FAILED; \
             goto cleanup; \
         } \
     } \
-    if (srp_ctx->field) { \
-        free((void *)srp_ctx->field); \
+    if ((srp_ctx)->field) { \
+        free((void *)(srp_ctx)->field); \
     } \
-    srp_ctx->field = tmp_c; \
+    (srp_ctx)->field = tmp_c; \
+    ret = SRP_ERR_OK; \
 }
 
 #define srp_context_set_N(srp_ctx, value) srp_context_set_mpi(srp_ctx, N, value)
@@ -392,48 +386,41 @@ cleanup:
 void srp_context_free(SRPContext *srp_ctx);
 
 // Create a new SRPContext and fill in N and g if predefined type
-static SRPContext *srp_context_new(SRP_ROLE role, SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
+static int srp_context_new(SRP_ROLE role, SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg, SRPContext **srp_ctx) {
     int ret;
     const char *s_hex;
-    mbedtls_mpi *N = NULL, *g = NULL;
-    SRPContext *srp_ctx = (SRPContext *)malloc(sizeof(SRPContext));
-    if (!srp_ctx) {
+    SRP_DECLARE_MPI(N);
+    SRP_DECLARE_MPI(g);
+
+    *srp_ctx = (SRPContext *)malloc(sizeof(SRPContext));
+    if (!*srp_ctx) {
         ESP_LOGD(TAG, "Could not allocate memory for new context\n");
-        goto cleanup;
+        return SRP_ERR_ALLOC_FAILED;
     }
-    memset(srp_ctx, 0, sizeof(SRPContext));
-    srp_ctx->role = role;
-    srp_ctx->halg = halg;
+    memset(*srp_ctx, 0, sizeof(SRPContext));
+    (*srp_ctx)->role = role;
+    (*srp_ctx)->halg = halg;
     // Set our modulus and generator here if we are a preset type
     if (type == SRP_TYPE_CUSTOM) {
-        return srp_ctx;
+        return SRP_ERR_OK;
     }
     s_hex = rfc5054_constants[type].n_hex;
-    N = srp_mpi_new();
+    ESP32_SRP_CHK(srp_mpi_new(&N));
     ESP32_SRP_CHK(mbedtls_mpi_read_string(N, 16, s_hex));
-    srp_context_set_N(srp_ctx, N);
+    srp_context_set_N(*srp_ctx, N);
     s_hex = rfc5054_constants[type].g_hex;
-    g = srp_mpi_new();
+    ESP32_SRP_CHK(srp_mpi_new(&g));
     ESP32_SRP_CHK(mbedtls_mpi_read_string(g, 16, s_hex));
-    srp_context_set_g(srp_ctx, g);
-    goto cleanup2;
+    srp_context_set_g(*srp_ctx, g);
+    ret = SRP_ERR_OK;
 cleanup:
-    srp_context_free(srp_ctx);
-    srp_ctx = NULL;
-cleanup2:
+    if (ret != SRP_ERR_OK) {
+        srp_context_free(*srp_ctx);
+        *srp_ctx = NULL;
+    }
     srp_mpi_free(N);
     srp_mpi_free(g);
-    return srp_ctx;
-}
-
-// Create a new client SRPContext
-static SRPContext *srp_context_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
-    return srp_context_new(SRP_ROLE_CLIENT, type, halg);
-}
-
-// Create a new server SRPContext
-static SRPContext *srp_context_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
-    return srp_context_new(SRP_ROLE_SERVER, type, halg);    
+    return ret;
 }
 
 // Free SRPContext
@@ -453,7 +440,7 @@ void srp_context_free(SRPContext *srp_ctx) {
         srp_mpi_free(srp_ctx->public_key);
         if (srp_ctx->username) free((void *)srp_ctx->username);
         free(srp_ctx);
-    }    
+    }
 }
 
 static void srp_context_dump(SRPContext *srp_ctx, const char *description) {
@@ -468,14 +455,13 @@ static void srp_context_dump(SRPContext *srp_ctx, const char *description) {
     // dump_big_number(srp_ctx->s, "srp_ctx->s");
     // dump_big_number(srp_ctx->x, "srp_ctx->x");
     // dump_big_number(srp_ctx->v, "srp_ctx->v");
-    // dump_big_number(srp_ctx->k, "srp_ctx->k");
     // dump_big_number(srp_ctx->S, "srp_ctx->S");
     // dump_big_number(srp_ctx->K, "srp_ctx->K");
     // dump_big_number(srp_ctx->M1, "srp_ctx->M1");
     // dump_big_number(srp_ctx->M2, "srp_ctx->M2");
     // dump_big_number(srp_ctx->private_key, "srp_ctx->private_key");
     // dump_big_number(srp_ctx->public_key, "srp_ctx->public_key");
-    printf("}\n");
+    // printf("}\n");
 }
 
 
@@ -628,7 +614,7 @@ static int srp_compute_M1(SRPContext *srp_ctx, mbedtls_mpi *A, mbedtls_mpi *B, m
     ESP32_SRP_CHK(srp_crypto_hash(alg, (const unsigned char*)srp_ctx->username, strlen(srp_ctx->username), hash_u));
     for (int i = 0; i < hash_len; i++) {
         hash_N[i]^= hash_g[i];
-    }    
+    }
     HashCTX ctx = { .halg = alg };
     ESP32_SRP_CHK(srp_crypto_hash_init(&ctx));
     ESP32_SRP_CHK(srp_crypto_hash_start(&ctx));
@@ -663,23 +649,26 @@ cleanup:
 
 // Server verification step
 static int srp_compute_key_server(SRPContext *srp_ctx, mbedtls_mpi *A) {
-    int ret;
     /*SRP-6a safety check */
     if (!(mbedtls_mpi_cmp_int(A, 0) == 1) || !(mbedtls_mpi_cmp_mpi(A, srp_ctx->N) == -1)) {
         return SRP_ERR_SAFETY_CHECK;
     }
-    mbedtls_mpi *S = srp_mpi_new();
-    mbedtls_mpi *u = srp_mpi_new();
-    mbedtls_mpi *K = srp_mpi_new();
-    mbedtls_mpi *M1 = srp_mpi_new();
-    mbedtls_mpi *M2 = srp_mpi_new();
-    mbedtls_mpi *tmp1 = srp_mpi_new();
-    mbedtls_mpi *tmp2 = srp_mpi_new();
-    // Consistency check
-    if (!S || !u || !K || !M1 || !M2 || !tmp1 || !tmp2) {
-        ret = SRP_ERR_OUT_OF_MEMORY;
-        goto cleanup;
-    }
+    int ret;
+    SRP_DECLARE_MPI(S);
+    SRP_DECLARE_MPI(u);
+    SRP_DECLARE_MPI(K);
+    SRP_DECLARE_MPI(M1);
+    SRP_DECLARE_MPI(M2);
+    SRP_DECLARE_MPI(tmp1);
+    SRP_DECLARE_MPI(tmp2);
+
+    ESP32_SRP_CHK(srp_mpi_new(&S));
+    ESP32_SRP_CHK(srp_mpi_new(&u));
+    ESP32_SRP_CHK(srp_mpi_new(&K));
+    ESP32_SRP_CHK(srp_mpi_new(&M1));
+    ESP32_SRP_CHK(srp_mpi_new(&M2));
+    ESP32_SRP_CHK(srp_mpi_new(&tmp1));
+    ESP32_SRP_CHK(srp_mpi_new(&tmp2));
 
     /* u = SHA(PAD(A) | PAD(B)) */
     ESP32_SRP_CHK(srp_context_calculate_u(srp_ctx, A, u));
@@ -712,24 +701,28 @@ cleanup:
 
 // Client verification step
 static int srp_compute_key_client(SRPContext *srp_ctx, mbedtls_mpi *B) {
-    int ret;
     /*SRP-6a safety check */
     if (!(mbedtls_mpi_cmp_int(B, 0) == 1) || !(mbedtls_mpi_cmp_mpi(B, srp_ctx->N) == -1)) {
         return SRP_ERR_SAFETY_CHECK;
     }
-    mbedtls_mpi *S = srp_mpi_new();
-    mbedtls_mpi *u = srp_mpi_new();
-    mbedtls_mpi *K = srp_mpi_new();
-    mbedtls_mpi *M1 = srp_mpi_new();
-    mbedtls_mpi *M2 = srp_mpi_new();
-    mbedtls_mpi *tmp1 = srp_mpi_new();
-    mbedtls_mpi *tmp2 = srp_mpi_new();
-    mbedtls_mpi *tmp3 = srp_mpi_new();
-    // Consistency check
-    if (!S || !u || !K || !M1 || !M2 || !tmp1 || !tmp2 || !tmp3) {
-        ret = SRP_ERR_OUT_OF_MEMORY;
-        goto cleanup;
-    }
+    int ret;
+    SRP_DECLARE_MPI(S);
+    SRP_DECLARE_MPI(u);
+    SRP_DECLARE_MPI(K);
+    SRP_DECLARE_MPI(M1);
+    SRP_DECLARE_MPI(M2);
+    SRP_DECLARE_MPI(tmp1);
+    SRP_DECLARE_MPI(tmp2);
+    SRP_DECLARE_MPI(tmp3);
+
+    ESP32_SRP_CHK(srp_mpi_new(&S));
+    ESP32_SRP_CHK(srp_mpi_new(&u));
+    ESP32_SRP_CHK(srp_mpi_new(&K));
+    ESP32_SRP_CHK(srp_mpi_new(&M1));
+    ESP32_SRP_CHK(srp_mpi_new(&M2));
+    ESP32_SRP_CHK(srp_mpi_new(&tmp1));
+    ESP32_SRP_CHK(srp_mpi_new(&tmp2));
+    ESP32_SRP_CHK(srp_mpi_new(&tmp3));
 
     /*u = SHA(PAD(A) | PAD(B))    */
     ESP32_SRP_CHK(srp_context_calculate_u(srp_ctx, B, u));
@@ -769,17 +762,19 @@ cleanup:
 
 static int srp_gen_pub_server(SRPContext *srp_ctx) {
     int ret;
-    mbedtls_mpi *b = srp_mpi_new();
-    mbedtls_mpi *B = srp_mpi_new();
-    mbedtls_mpi *k = srp_mpi_new();
-    mbedtls_mpi *tmp1 = srp_mpi_new();
-    mbedtls_mpi *tmp2 = srp_mpi_new();
-    mbedtls_mpi *tmp3 = srp_mpi_new();        
-    // Consistency check
-    if (!b || !B || !k || !tmp1 || !tmp2 || !tmp3) {
-        ret = SRP_ERR_OUT_OF_MEMORY;
-        goto cleanup;
-    }
+    SRP_DECLARE_MPI(b);
+    SRP_DECLARE_MPI(B);
+    SRP_DECLARE_MPI(k);
+    SRP_DECLARE_MPI(tmp1);
+    SRP_DECLARE_MPI(tmp2);
+    SRP_DECLARE_MPI(tmp3);
+
+    ESP32_SRP_CHK(srp_mpi_new(&b));
+    ESP32_SRP_CHK(srp_mpi_new(&B));
+    ESP32_SRP_CHK(srp_mpi_new(&k));
+    ESP32_SRP_CHK(srp_mpi_new(&tmp1));
+    ESP32_SRP_CHK(srp_mpi_new(&tmp2));
+    ESP32_SRP_CHK(srp_mpi_new(&tmp3));
 
 #ifdef _SRP_TEST_VECTOR
     ESP32_SRP_CHK(mbedtls_mpi_read_string(b, 16, "E487CB59D31AC550471E81F00F6928E01DDA08E974A004F49E61F5D105284D20"));
@@ -814,15 +809,13 @@ cleanup:
 
 static int srp_gen_pub_client(SRPContext *srp_ctx) {
     int ret;
+    SRP_DECLARE_MPI(a);
+    SRP_DECLARE_MPI(A);
+    SRP_DECLARE_MPI(k);
 
-    mbedtls_mpi *a = srp_mpi_new();
-    mbedtls_mpi *A = srp_mpi_new();
-    mbedtls_mpi *k = srp_mpi_new();
-    // Consistency check
-    if (!a || !A || !k) {
-        ret = SRP_ERR_OUT_OF_MEMORY;
-        goto cleanup;
-    }
+    ESP32_SRP_CHK(srp_mpi_new(&a));
+    ESP32_SRP_CHK(srp_mpi_new(&A));
+    ESP32_SRP_CHK(srp_mpi_new(&k));
 
 #ifdef _SRP_TEST_VECTOR
     ESP32_SRP_CHK(mbedtls_mpi_read_string(a, 16, "60975527035CF2AD1989806F0407210BC81EDC04E2762A56AFD529DDDA2D4393"));
@@ -852,49 +845,54 @@ cleanup:
 // Must be called before using the srp functions
 int srp_init(const unsigned char *crypto_seed, int crypto_seed_len) {
     if (!RR) {
-        RR = srp_mpi_new();
+        if (srp_mpi_new(&RR)) {
+            return SRP_ERR_ALLOC_FAILED;
+        }
         return srp_crypto_random_init(crypto_seed, crypto_seed_len);
     }
     return SRP_ERR_OK;
 }
 
-SRPContext *srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
+int srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg, SRPContext **srp_ctx) {
+    if (!srp_ctx) {
+        return SRP_ERR_ARGUMENTS_MISMATCH;
+    }
     if (!RR) {
         ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
-        return NULL;
+        return SRP_ERR_NOT_INITIALIZED;
     }
-    SRPContext *srp_ctx = srp_context_new_client(type, halg);
-    return srp_ctx;
+    int ret;
+    ESP32_SRP_CHK(srp_context_new(SRP_ROLE_CLIENT, type, halg, srp_ctx));
+    return SRP_ERR_OK;
+
+cleanup:
+    return ret;
 }
 
-SRPContext *srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
-    int ret;
+int srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg, SRPContext **srp_ctx) {
+    if (!srp_ctx) {
+        return SRP_ERR_ARGUMENTS_MISMATCH;
+    }
     if (!RR) {
         ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
-        return NULL;
+        return SRP_ERR_NOT_INITIALIZED;
     }
-    SRPContext *srp_ctx = NULL;
-    mbedtls_mpi *s = srp_mpi_new();
-    if (!s) {
-        goto cleanup;
-    }
-    srp_ctx = srp_context_new_server(type, halg);
-    if (!srp_ctx) {
-        goto cleanup;
-    }
+    int ret;
+    SRP_DECLARE_MPI(s);
+
+    ESP32_SRP_CHK(srp_mpi_new(&s));
+    ESP32_SRP_CHK(srp_context_new(SRP_ROLE_SERVER, type, halg, srp_ctx));
 #ifdef _SRP_TEST_VECTOR
     ESP32_SRP_CHK(mbedtls_mpi_read_string(s, 16, "BEB25379D1A8581EB5A727673A2441EE"));
 #else
     ESP32_SRP_CHK(srp_mpi_fill_random(s, 16));
 #endif
-    srp_context_set_s(srp_ctx, s);
-    srp_mpi_free(s);
-    return srp_ctx;
+    srp_context_set_s(*srp_ctx, s);
 
 cleanup:
-    if (srp_ctx) srp_context_free(srp_ctx);
+    if (ret != SRP_ERR_OK) srp_context_free(*srp_ctx);
     srp_mpi_free(s);
-    return NULL;
+    return ret;
 }
 
 int srp_set_params(SRPContext *srp_ctx, mbedtls_mpi *modulus, mbedtls_mpi *generator, mbedtls_mpi *salt) {
@@ -939,12 +937,11 @@ int srp_set_auth_password(SRPContext *srp_ctx, const unsigned char *password, in
     if (!srp_ctx->username || !srp_ctx->s) {
         return SRP_ERR_ARGUMENTS_MISMATCH;
     }
-    mbedtls_mpi *x = srp_mpi_new();
-    mbedtls_mpi *v = srp_mpi_new();
-    if (!x || !v) {
-        ret = SRP_ERR_OUT_OF_MEMORY;
-        goto cleanup;
-    }
+    SRP_DECLARE_MPI(x);
+    SRP_DECLARE_MPI(v);
+
+    ESP32_SRP_CHK(srp_mpi_new(&x));
+    ESP32_SRP_CHK(srp_mpi_new(&v));
     ESP32_SRP_CHK(srp_context_calculate_x(srp_ctx, password, password_len, x));
     srp_context_set_x(srp_ctx, x);
     if (srp_ctx->role == SRP_ROLE_SERVER) {
@@ -996,7 +993,7 @@ int srp_verify_key(SRPContext *srp_ctx, mbedtls_mpi *M) {
     }
     else if (srp_ctx->role == SRP_ROLE_CLIENT) {
         return mbedtls_mpi_cmp_mpi(srp_ctx->M2, M);
-    }    
+    }
     return SRP_ERR_UNSUPPORTED_ROLE;
 }
 
