@@ -71,7 +71,10 @@ void app_main() {
 
     start = get_usec();
     // It is imperative to initialize the SRP system first
-    srp_init(crypto_seed, 128);
+    // The system will be seeded with new random 128 bits
+    srp_init(NULL, 0);
+    // The system can also be seeded with supplied seed
+    // srp_init(crypto_seed, 128);
     for (int i = 0; i < niter; i++) {
         int ret;
         SRPContext srp_server;

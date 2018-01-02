@@ -37,6 +37,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include "esp_system.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/sha256.h"
@@ -245,6 +246,13 @@ typedef struct {
 
 static mbedtls_entropy_context entropy_ctx;
 static mbedtls_ctr_drbg_context ctr_drbg_ctx;
+
+static void srp_system_random_buffer(void * const buf, const size_t size) {
+    uint8_t *p = (uint8_t *)buf;
+    for (size_t i = 0; i < size; i++) {
+        p[i] = esp_random();
+    }
+}
 
 /*
  *  Random functions
@@ -871,9 +879,15 @@ cleanup:
 
 // Must be called before using the srp functions
 int srp_init(const unsigned char *crypto_seed, int crypto_seed_len) {
+    uint8_t seed_buffer[128];
     if (!RR) {
         if (srp_mpi_new(&RR)) {
             return SRP_ERR_ALLOC_FAILED;
+        }
+        if (!crypto_seed || !crypto_seed_len) {
+            srp_system_random_buffer(seed_buffer, 128);
+            crypto_seed = seed_buffer;
+            crypto_seed_len = 128;
         }
         return srp_crypto_random_init(crypto_seed, crypto_seed_len);
     }
