@@ -45,8 +45,8 @@ extern "C" {
 
 #define SRP_VERSION_MAJ                 0
 #define SRP_VERSION_MIN                 2
-#define SRP_VERSION_REV                 0
-#define SRP_VERSION_STR                 "0.2.0"
+#define SRP_VERSION_REV                 1
+#define SRP_VERSION_STR                 "0.2.1"
 #define SRP_VERSION_CHK(maj, min)       ((maj==SRP_VERSION_MAJ) && (min<=SRP_VERSION_MIN))
 
 #define SRP_ERR_OK                      0

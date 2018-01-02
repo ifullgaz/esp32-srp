@@ -947,9 +947,9 @@ int srp_get_verify_key(SRPContext srp_ctx, mbedtls_mpi **verify_key) {
     }
     switch (srp_ctx->role) {
         case SRP_ROLE_SERVER:
-            *verify_key = srp_ctx->M2;
+            *verify_key = srp_ctx->M2; break;
         case SRP_ROLE_CLIENT:
-            *verify_key = srp_ctx->M1;
+            *verify_key = srp_ctx->M1; break;
         default:
             return SRP_ERR_UNSUPPORTED_ROLE;
     }

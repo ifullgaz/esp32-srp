@@ -4,7 +4,7 @@
 #
 
 PROJECT_NAME := esp32-srp-test
-EXTRA_COMPONENT_DIRS := $(abspath ./../../)
+EXTRA_COMPONENT_DIRS := $(abspath ./../)
 #CFLAGS := -D_SRP_TEST_VECTOR
 
 include $(IDF_PATH)/make/project.mk
