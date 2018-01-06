@@ -37,6 +37,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include "esp_system.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
@@ -480,10 +481,10 @@ void srp_context_free(SRPContext srp_ctx) {
 
 static void srp_context_dump(SRPContext srp_ctx, const char *description) {
     if (description) {
-        printf("%s\n", description);
+        ESP_LOGD(TAG, "%s", description);
     }
 
-    printf("Context - Role = %s, Hash = %s\n", srp_role_name[srp_ctx->role], srp_crypto_hash_alogrithm_name[srp_ctx->role]);
+    // ESP_LOGD(TAG, "Context - Role = %s, Hash = %s", srp_role_name[srp_ctx->role], srp_crypto_hash_alogrithm_name[srp_ctx->role]);
     // dump_string(srp_ctx->username, "User name");
     // dump_big_number(srp_ctx->N, "srp_ctx->N");
     // dump_big_number(srp_ctx->g, "srp_ctx->g");
@@ -496,7 +497,7 @@ static void srp_context_dump(SRPContext srp_ctx, const char *description) {
     // dump_big_number(srp_ctx->M2, "srp_ctx->M2");
     // dump_big_number(srp_ctx->private_key, "srp_ctx->private_key");
     // dump_big_number(srp_ctx->public_key, "srp_ctx->public_key");
-    // printf("}\n");
+    // ESP_LOGD(TAG, "}");
 }
 
 
@@ -894,80 +895,93 @@ int srp_init(const unsigned char *crypto_seed, int crypto_seed_len) {
     return SRP_ERR_OK;
 }
 
-int srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg, SRPContext *srp_ctx) {
-    if (!srp_ctx) {
-        return SRP_ERR_ARGUMENTS_MISMATCH;
-    }
+SRPContext srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
     if (!RR) {
         ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
-        return SRP_ERR_NOT_INITIALIZED;
+        errno = SRP_ERR_NOT_INITIALIZED;
+        return NULL;
     }
     int ret;
-    ESP32_SRP_CHK(srp_context_new(SRP_ROLE_CLIENT, type, halg, srp_ctx));
-    return SRP_ERR_OK;
+    SRPContext srp_ctx = NULL;
+    ESP32_SRP_CHK(srp_context_new(SRP_ROLE_CLIENT, type, halg, &srp_ctx));
 
 cleanup:
-    return ret;
+    errno = ret;
+    return srp_ctx;
 }
 
-int srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg, SRPContext *srp_ctx) {
-    if (!srp_ctx) {
-        return SRP_ERR_ARGUMENTS_MISMATCH;
-    }
+SRPContext srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
     if (!RR) {
         ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
-        return SRP_ERR_NOT_INITIALIZED;
+        errno = SRP_ERR_NOT_INITIALIZED;
+        return NULL;
     }
     int ret;
     SRP_DECLARE_MPI(s);
 
     ESP32_SRP_CHK(srp_mpi_new(&s));
-    ESP32_SRP_CHK(srp_context_new(SRP_ROLE_SERVER, type, halg, srp_ctx));
+
+    SRPContext srp_ctx = NULL;
+    ESP32_SRP_CHK(srp_context_new(SRP_ROLE_SERVER, type, halg, &srp_ctx));
 #ifdef _SRP_TEST_VECTOR
     ESP32_SRP_CHK(mbedtls_mpi_read_string(s, 16, "BEB25379D1A8581EB5A727673A2441EE"));
 #else
     ESP32_SRP_CHK(srp_mpi_fill_random(s, 16));
 #endif
-    srp_context_set_s(*srp_ctx, s);
+    srp_context_set_s(srp_ctx, s);
 
 cleanup:
-    if (ret != SRP_ERR_OK) srp_context_free(*srp_ctx);
+    errno = ret;
     srp_mpi_free(s);
-    return ret;
-}
-
-int srp_get_salt(SRPContext srp_ctx, mbedtls_mpi **salt) {
-    if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
-        return SRP_ERR_NOT_INITIALIZED;
+    if (ret) {
+        srp_context_free(srp_ctx);
+        srp_ctx = NULL;
     }
-    *salt = srp_ctx->s;
-    return SRP_ERR_OK;
+    return srp_ctx;
 }
 
-int srp_get_public_key(SRPContext srp_ctx, mbedtls_mpi **public_key) {
+mbedtls_mpi *srp_get_salt(SRPContext srp_ctx) {
     if (!RR) {
         ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
-        return SRP_ERR_NOT_INITIALIZED;
+        errno = SRP_ERR_NOT_INITIALIZED;
+        return NULL;
     }
-    *public_key = srp_ctx->public_key;
-    return SRP_ERR_OK;
+    return srp_ctx->s;
 }
 
-int srp_get_verify_key(SRPContext srp_ctx, mbedtls_mpi **verify_key) {
+mbedtls_mpi *srp_get_public_key(SRPContext srp_ctx) {
     if (!RR) {
         ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
-        return SRP_ERR_NOT_INITIALIZED;
+        errno = SRP_ERR_NOT_INITIALIZED;
+        return NULL;
+    }
+    return srp_ctx->public_key;
+}
+
+mbedtls_mpi *srp_get_session_secret(SRPContext srp_ctx) {
+    if (!RR) {
+        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        errno = SRP_ERR_NOT_INITIALIZED;
+        return NULL;
+    }
+    return srp_ctx->K;
+}
+
+mbedtls_mpi *srp_get_verify_key(SRPContext srp_ctx) {
+    if (!RR) {
+        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        errno = SRP_ERR_NOT_INITIALIZED;
+        return NULL;
     }
     switch (srp_ctx->role) {
         case SRP_ROLE_SERVER:
-            *verify_key = srp_ctx->M2; break;
+            return srp_ctx->M2;
         case SRP_ROLE_CLIENT:
-            *verify_key = srp_ctx->M1; break;
+            return srp_ctx->M1;
         default:
-            return SRP_ERR_UNSUPPORTED_ROLE;
+            errno = SRP_ERR_UNSUPPORTED_ROLE;
     }
-    return SRP_ERR_OK;
+    return NULL;
 }
 
 int srp_set_params(SRPContext srp_ctx, mbedtls_mpi *modulus, mbedtls_mpi *generator, mbedtls_mpi *salt) {
@@ -1072,12 +1086,12 @@ int srp_verify_key(SRPContext srp_ctx, mbedtls_mpi *M) {
     return SRP_ERR_UNSUPPORTED_ROLE;
 }
 
-void srp_free(SRPContext srp_ctx) {
+void srp_free(void *s) {
     if (!RR) {
         ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         return;
     }
-    srp_context_free(srp_ctx);
+    srp_context_free((SRPContext)s);
 }
 
 void srp_dump_context(SRPContext srp_ctx, const char *description) {

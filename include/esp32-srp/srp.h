@@ -44,9 +44,9 @@ extern "C" {
 #include "mbedtls/bignum.h"
 
 #define SRP_VERSION_MAJ                 0
-#define SRP_VERSION_MIN                 2
-#define SRP_VERSION_REV                 2
-#define SRP_VERSION_STR                 "0.2.2"
+#define SRP_VERSION_MIN                 3
+#define SRP_VERSION_REV                 0
+#define SRP_VERSION_STR                 "0.3.0"
 #define SRP_VERSION_CHK(maj, min)       ((maj==SRP_VERSION_MAJ) && (min<=SRP_VERSION_MIN))
 
 #define SRP_ERR_OK                      0
@@ -66,6 +66,12 @@ extern "C" {
 
 #define ESP32_SRP_CHK(f) \
 if (( ret = f ) != SRP_ERR_OK) { \
+    goto cleanup; \
+}
+
+#define ESP32_SRP_SET(v, f) \
+if (!( v = f )) { \
+    ret = errno; \
     goto cleanup; \
 }
 
@@ -107,16 +113,19 @@ typedef struct _SRPContext *SRPContext;
 // Must be called before calling any of the srp functions
 // crypto_seed is optional and can be NULL
 int srp_init(const unsigned char *crypto_seed, int crypto_seed_len);
+
 // Create a new SRP client context
-int srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg, SRPContext *srp_ctx);
+SRPContext srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg);
 // Create a new SRP server context
-int srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg, SRPContext *srp_ctx);
-// Get the salt from the context
-int srp_get_salt(SRPContext srp_ctx, mbedtls_mpi **salt);
+SRPContext srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg);
+// Get the salt from the context (s)
+mbedtls_mpi *srp_get_salt(SRPContext srp_ctx);
 // Get the public key from the context
-int srp_get_public_key(SRPContext srp_ctx, mbedtls_mpi **public_key);
-// Get the verification key from the context
-int srp_get_verify_key(SRPContext srp_ctx, mbedtls_mpi **verify_key);
+mbedtls_mpi *srp_get_public_key(SRPContext srp_ctx);
+// Get the session secret (K)
+mbedtls_mpi *srp_get_session_secret(SRPContext srp_ctx);
+// Get the verification key from the context (M1 for client, M2 for server)
+mbedtls_mpi *srp_get_verify_key(SRPContext srp_ctx);
 // Set the username
 int srp_set_username(SRPContext srp_ctx, const char *username);
 // Set the password
@@ -130,9 +139,9 @@ int srp_compute_key(SRPContext srp_ctx, mbedtls_mpi *public_key);
 // Check the verification key from the counterpart
 int srp_verify_key(SRPContext srp_ctx, mbedtls_mpi *M);
 // Ends the SRP session
-void srp_free(SRPContext srp_ctx);
+void srp_free(void *srp_ctx);
 
-// Utility to display the context of a context
+// Utility to display a context
 void srp_dump_context(SRPContext srp_ctx, const char *description);
 
 #endif // _SRP_H
