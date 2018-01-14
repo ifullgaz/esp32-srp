@@ -78,8 +78,8 @@ static void srp_test_task(void *context) {
 
     for (int i = 0; i < niter; i++) {
         int ret = 0;
-        SRPContext srp_server = NULL;
-        SRPContext srp_client = NULL;
+        srp_context_t srp_server = NULL;
+        srp_context_t srp_client = NULL;
         mbedtls_mpi *salt;
         mbedtls_mpi *public_key;
         mbedtls_mpi *verify_key;
@@ -89,10 +89,6 @@ static void srp_test_task(void *context) {
         ESP_LOGD(TAG, "srp_new_server");
         inter_start = get_usec();
         ESP32_SRP_SET(srp_server, srp_new_server(ng_type, alg));
-        // if (!(srp_server = srp_new_server(ng_type, alg))) {
-        //     ret = errno;
-        //     goto cleanup;
-        // }
         inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
         ESP_LOGD(TAG, "Usec srp_new_server: %llu", inter_duration);
@@ -103,10 +99,6 @@ static void srp_test_task(void *context) {
         ESP_LOGD(TAG, "srp_new_client");
         inter_start = get_usec();
         ESP32_SRP_SET(srp_client, srp_new_client(ng_type, alg));
-        // if (!(srp_client = srp_new_client(ng_type, alg))) {
-        //     ret = errno;
-        //     goto cleanup;            
-        // }
         inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
         ESP_LOGD(TAG, "Usec srp_new_client: %llu", inter_duration);
@@ -241,6 +233,7 @@ cleanup:
         ESP_LOGI(TAG, "uSec server CPU: %llu (avg: %llu)", server_duration, server_duration / (i + 1));
         ESP_LOGI(TAG, "uSec client CPU: %llu (avg: %llu)", client_duration, client_duration / (i + 1));
         ESP_LOGI(TAG, "Total tests: %d, successes: %d, failures: %d", (i + 1), successes, failures);
+        vTaskDelay(1);
     }
 
     duration = get_usec() - start;
@@ -255,12 +248,7 @@ cleanup:
 
 int start_srp_test_task() {
     xTaskHandle handle;
-    int ret = xTaskCreate(srp_test_task,
-                      "SRP_Task",
-                      10240,
-                      NULL,
-                      5,
-                      &handle); 
+    int ret = xTaskCreate(srp_test_task, "SRP_Task", 10240, NULL, 8, &handle); 
 
     if (ret != pdPASS)  {
         ESP_LOGI(TAG, "create task %s failed", "SRP_Task");

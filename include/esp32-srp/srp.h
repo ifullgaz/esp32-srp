@@ -44,9 +44,9 @@ extern "C" {
 #include "mbedtls/bignum.h"
 
 #define SRP_VERSION_MAJ                 0
-#define SRP_VERSION_MIN                 3
+#define SRP_VERSION_MIN                 4
 #define SRP_VERSION_REV                 0
-#define SRP_VERSION_STR                 "0.3.0"
+#define SRP_VERSION_STR                 "0.4.0"
 #define SRP_VERSION_CHK(maj, min)       ((maj==SRP_VERSION_MAJ) && (min<=SRP_VERSION_MIN))
 
 #define SRP_ERR_OK                      0
@@ -108,41 +108,41 @@ typedef enum  {
 /**
  * SRP context. Note that it should be considered read only
  */
-typedef struct _SRPContext *SRPContext;
+typedef struct _srp_context *srp_context_t;
 
 // Must be called before calling any of the srp functions
 // crypto_seed is optional and can be NULL
 int srp_init(const unsigned char *crypto_seed, int crypto_seed_len);
 
 // Create a new SRP client context
-SRPContext srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg);
+srp_context_t srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg);
 // Create a new SRP server context
-SRPContext srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg);
+srp_context_t srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg);
 // Get the salt from the context (s)
-mbedtls_mpi *srp_get_salt(SRPContext srp_ctx);
+mbedtls_mpi *srp_get_salt(srp_context_t srp_ctx);
 // Get the public key from the context
-mbedtls_mpi *srp_get_public_key(SRPContext srp_ctx);
+mbedtls_mpi *srp_get_public_key(srp_context_t srp_ctx);
 // Get the session secret (K)
-mbedtls_mpi *srp_get_session_secret(SRPContext srp_ctx);
+mbedtls_mpi *srp_get_session_secret(srp_context_t srp_ctx);
 // Get the verification key from the context (M1 for client, M2 for server)
-mbedtls_mpi *srp_get_verify_key(SRPContext srp_ctx);
+mbedtls_mpi *srp_get_verify_key(srp_context_t srp_ctx);
 // Set the username
-int srp_set_username(SRPContext srp_ctx, const char *username);
+int srp_set_username(srp_context_t srp_ctx, const char *username);
 // Set the password
-int srp_set_auth_password(SRPContext srp_ctx, const unsigned char * p, int plen);
+int srp_set_auth_password(srp_context_t srp_ctx, const unsigned char * p, int plen);
 // Set params N, g and s. Wither of these parameters can be NULL, in which case existing values are not affected
-int srp_set_params(SRPContext srp_ctx, mbedtls_mpi *modulus, mbedtls_mpi *generator, mbedtls_mpi *salt);
+int srp_set_params(srp_context_t srp_ctx, mbedtls_mpi *modulus, mbedtls_mpi *generator, mbedtls_mpi *salt);
 // Generate the private and public key
-int srp_gen_pub(SRPContext srp_ctx);
+int srp_gen_pub(srp_context_t srp_ctx);
 // Compute the secret key and associated verification keys
-int srp_compute_key(SRPContext srp_ctx, mbedtls_mpi *public_key);
+int srp_compute_key(srp_context_t srp_ctx, mbedtls_mpi *public_key);
 // Check the verification key from the counterpart
-int srp_verify_key(SRPContext srp_ctx, mbedtls_mpi *M);
+int srp_verify_key(srp_context_t srp_ctx, mbedtls_mpi *M);
 // Ends the SRP session
 void srp_free(void *srp_ctx);
 
 // Utility to display a context
-void srp_dump_context(SRPContext srp_ctx, const char *description);
+void srp_dump_context(srp_context_t srp_ctx, const char *description);
 
 #endif // _SRP_H
 #ifdef __cplusplus
