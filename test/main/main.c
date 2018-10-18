@@ -86,116 +86,116 @@ static void srp_test_task(void *context) {
 
         ESP_LOGI(TAG, "\nIteration: %d -------------------------------------------------------------------------------------------\n", i + 1);
 
-        ESP_LOGD(TAG, "srp_new_server");
+        ESP_LOGI(TAG, "srp_new_server");
         inter_start = get_usec();
         ESP32_SRP_SET(srp_server, srp_new_server(ng_type, alg));
         inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec srp_new_server: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec srp_new_server: %llu", inter_duration);
         srp_dump_context(srp_server, "srp_new_server");
 
-        ESP_LOGD(TAG, "====================== M1: Client -> Server -- 'SRP Start Request'");
+        ESP_LOGI(TAG, "====================== M1: Client -> Server -- 'SRP Start Request'");
 
-        ESP_LOGD(TAG, "srp_new_client");
+        ESP_LOGI(TAG, "srp_new_client");
         inter_start = get_usec();
         ESP32_SRP_SET(srp_client, srp_new_client(ng_type, alg));
         inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec srp_new_client: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec srp_new_client: %llu", inter_duration);
         srp_dump_context(srp_client, "srp_new_client");
 
-        ESP_LOGD(TAG, "====================== M2: Server -> Client -- 'SRP Start Response'");
+        ESP_LOGI(TAG, "====================== M2: Server -> Client -- 'SRP Start Response'");
 
-        ESP_LOGD(TAG, "Server srp_set_username");
+        ESP_LOGI(TAG, "Server srp_set_username");
         inter_start = get_usec();
         ESP32_SRP_CHK(srp_set_username(srp_server, username));
         inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec server srp_set_username: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec server srp_set_username: %llu", inter_duration);
         srp_dump_context(srp_server, "srp_set_username");
 
-        ESP_LOGD(TAG, "Server srp_set_auth_password");
+        ESP_LOGI(TAG, "Server srp_set_auth_password");
         inter_start = get_usec();
         ESP32_SRP_CHK(srp_set_auth_password(srp_server, (const unsigned char *)password, strlen(password)));
         inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec server srp_set_auth_password: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec server srp_set_auth_password: %llu", inter_duration);
         srp_dump_context(srp_server, "srp_set_auth_password");
 
-        ESP_LOGD(TAG, "Server srp_gen_pub");
+        ESP_LOGI(TAG, "Server srp_gen_pub");
         inter_start = get_usec();
         ESP32_SRP_CHK(srp_gen_pub(srp_server));
         inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec server srp_gen_pub: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec server srp_gen_pub: %llu", inter_duration);
         srp_dump_context(srp_server, "srp_set_auth_password");
 
-        ESP_LOGD(TAG, "====================== M3: Client -> Server -- 'SRP Verify Request'");
+        ESP_LOGI(TAG, "====================== M3: Client -> Server -- 'SRP Verify Request'");
 
-        ESP_LOGD(TAG, "Server srp_get_salt");
+        ESP_LOGI(TAG, "Server srp_get_salt");
         inter_start = get_usec();
         ESP32_SRP_SET(salt, srp_get_salt(srp_server));
         // This is safe because numbers are copied
         ESP32_SRP_CHK(srp_set_params(srp_client, NULL, NULL, salt));
         inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec client srp_set_params: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec client srp_set_params: %llu", inter_duration);
         srp_dump_context(srp_client, "srp_set_params");
 
-        ESP_LOGD(TAG, "Client srp_gen_pub");
+        ESP_LOGI(TAG, "Client srp_gen_pub");
         inter_start = get_usec();
         ESP32_SRP_CHK(srp_gen_pub(srp_client));
         inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec client srp_gen_pub: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec client srp_gen_pub: %llu", inter_duration);
         srp_dump_context(srp_client, "srp_gen_pub");
 
-        ESP_LOGD(TAG, "Client srp_set_username");
+        ESP_LOGI(TAG, "Client srp_set_username");
         inter_start = get_usec();
         // Get the password from the user but here we know it already
         ESP32_SRP_CHK(srp_set_username(srp_client, username));
         inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec client srp_set_username: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec client srp_set_username: %llu", inter_duration);
         srp_dump_context(srp_client, "srp_set_username");
 
-        ESP_LOGD(TAG, "Client srp_set_auth_password");
+        ESP_LOGI(TAG, "Client srp_set_auth_password");
         inter_start = get_usec();
         // Get the password from the user but here we know it already
         ESP32_SRP_CHK(srp_set_auth_password(srp_client, (const unsigned char *)password, strlen(password)));
         inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec client srp_set_auth_password: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec client srp_set_auth_password: %llu", inter_duration);
         srp_dump_context(srp_client, "srp_set_auth_password");
 
-        ESP_LOGD(TAG, "Client srp_compute_key");
+        ESP_LOGI(TAG, "Client srp_compute_key");
         inter_start = get_usec();
         ESP32_SRP_SET(public_key, srp_get_public_key(srp_server));
         // Get the password from the user; the server sent its public key earlier
         ESP32_SRP_CHK(srp_compute_key(srp_client, public_key));
         inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec client srp_compute_key: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec client srp_compute_key: %llu", inter_duration);
         srp_dump_context(srp_client, "srp_compute_key");
 
-        ESP_LOGD(TAG, "====================== M4: Server -> Client -- 'SRP Verify Response'");
+        ESP_LOGI(TAG, "====================== M4: Server -> Client -- 'SRP Verify Response'");
 
-        ESP_LOGD(TAG, "Server srp_compute_key");
+        ESP_LOGI(TAG, "Server srp_compute_key");
         inter_start = get_usec();
         ESP32_SRP_SET(public_key, srp_get_public_key(srp_client));
         ESP32_SRP_CHK(srp_compute_key(srp_server, public_key));
         inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec server srp_compute_key: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec server srp_compute_key: %llu", inter_duration);
         srp_dump_context(srp_server, "srp_compute_key");
 
-        ESP_LOGD(TAG, "Server srp_verify_key");
+        ESP_LOGI(TAG, "Server srp_verify_key");
         inter_start = get_usec();
         ESP32_SRP_SET(verify_key, srp_get_verify_key(srp_client));
         ret = srp_verify_key(srp_server, verify_key);
         inter_duration = get_usec() - inter_start;
         server_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec server srp_verify_key: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec server srp_verify_key: %llu", inter_duration);
         srp_dump_context(srp_server, "srp_compute_key");
 
         if (ret) {
@@ -203,15 +203,15 @@ static void srp_test_task(void *context) {
             goto cleanup;
         }
 
-        ESP_LOGD(TAG, "====================== M5: Client -> Server -- 'Exchange Request'");
+        ESP_LOGI(TAG, "====================== M5: Client -> Server -- 'Exchange Request'");
 
-        ESP_LOGD(TAG, "Client srp_verify_key");
+        ESP_LOGI(TAG, "Client srp_verify_key");
         inter_start = get_usec();
         ESP32_SRP_SET(verify_key, srp_get_verify_key(srp_server));
         ret = srp_verify_key(srp_client, verify_key);
         inter_duration = get_usec() - inter_start;
         client_duration+= inter_duration;
-        ESP_LOGD(TAG, "Usec client srp_verify_key: %llu", inter_duration);
+        ESP_LOGI(TAG, "Usec client srp_verify_key: %llu", inter_duration);
         srp_dump_context(srp_client, "srp_compute_key");
 
         if (ret) {
@@ -226,7 +226,7 @@ cleanup:
         }
         else {
             successes++;
-            ESP_LOGD(TAG, "Authentication successful");
+            ESP_LOGI(TAG, "Authentication successful");
         }
         srp_free(srp_server);
         srp_free(srp_client);
@@ -238,8 +238,8 @@ cleanup:
 
     duration = get_usec() - start;
 
-    ESP_LOGD(TAG, "uSec total: %llu", duration);
-    ESP_LOGD(TAG, "uSec total CPU: %llu (avg: %llu)", server_duration + client_duration, (server_duration + client_duration) / niter);
+    ESP_LOGI(TAG, "uSec total: %llu", duration);
+    ESP_LOGI(TAG, "uSec total CPU: %llu (avg: %llu)", server_duration + client_duration, (server_duration + client_duration) / niter);
     ESP_LOGI(TAG, "uSec server CPU: %llu (avg: %llu)", server_duration, server_duration / niter);
     ESP_LOGI(TAG, "uSec client CPU: %llu (avg: %llu)", client_duration, client_duration / niter);
     ESP_LOGI(TAG, "Total tests: %d, successes: %d, failures: %d", niter, successes, failures);
@@ -248,7 +248,7 @@ cleanup:
 
 int start_srp_test_task() {
     xTaskHandle handle;
-    int ret = xTaskCreate(srp_test_task, "SRP_Task", 10240, NULL, 8, &handle); 
+    int ret = xTaskCreate(srp_test_task, "SRP_Task", 10240, NULL, 8, &handle);
 
     if (ret != pdPASS)  {
         ESP_LOGI(TAG, "create task %s failed", "SRP_Task");
@@ -258,7 +258,7 @@ int start_srp_test_task() {
 
 void app_main() {
 
-    ESP_LOGD(TAG, "\nSRP Version: %s\n", SRP_VERSION_STR);
+    ESP_LOGI(TAG, "\nSRP Version: %s\n", SRP_VERSION_STR);
     // It is imperative to initialize the SRP system first
     // The system will be seeded with new random 128 bits
     srp_init(NULL, 0);

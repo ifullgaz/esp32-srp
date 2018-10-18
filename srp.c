@@ -396,7 +396,7 @@ cleanup:
     char *tmp_c = NULL; \
     if (value) { \
         if (!(tmp_c = strdup(value))) { \
-            ESP_LOGD(TAG, "Could not duplicate string string \"%s\"", value); \
+            ESP_LOGI(TAG, "Could not duplicate string string \"%s\"", value); \
             ret = SRP_ERR_ALLOC_FAILED; \
             goto cleanup; \
         } \
@@ -433,7 +433,7 @@ static int srp_context_new(SRP_ROLE role, SRP_TYPE type, SRP_CRYPTO_HASH_ALGORIT
 
     *srp_ctx = (srp_context_t)malloc(sizeof(struct _srp_context));
     if (!*srp_ctx) {
-        ESP_LOGD(TAG, "Could not allocate memory for new context\n");
+        ESP_LOGI(TAG, "Could not allocate memory for new context\n");
         return SRP_ERR_ALLOC_FAILED;
     }
     memset(*srp_ctx, 0, sizeof(struct _srp_context));
@@ -484,10 +484,10 @@ void srp_context_free(srp_context_t srp_ctx) {
 
 static void srp_context_dump(srp_context_t srp_ctx, const char *description) {
     if (description) {
-        ESP_LOGD(TAG, "%s", description);
+        ESP_LOGI(TAG, "%s", description);
     }
 
-    // ESP_LOGD(TAG, "Context - Role = %s, Hash = %s", srp_role_name[srp_ctx->role], srp_crypto_hash_alogrithm_name[srp_ctx->role]);
+    // ESP_LOGI(TAG, "Context - Role = %s, Hash = %s", srp_role_name[srp_ctx->role], srp_crypto_hash_alogrithm_name[srp_ctx->role]);
     // dump_string(srp_ctx->username, "User name");
     // dump_big_number(srp_ctx->N, "srp_ctx->N");
     // dump_big_number(srp_ctx->g, "srp_ctx->g");
@@ -500,14 +500,13 @@ static void srp_context_dump(srp_context_t srp_ctx, const char *description) {
     // dump_big_number(srp_ctx->M2, "srp_ctx->M2");
     // dump_big_number(srp_ctx->private_key, "srp_ctx->private_key");
     // dump_big_number(srp_ctx->public_key, "srp_ctx->public_key");
-    // ESP_LOGD(TAG, "}");
+    // ESP_LOGI(TAG, "}");
 }
 
 
 /***********************************************************************************************************
  * Private interface
  ***********************************************************************************************************/
-
 static int srp_context_adjust_size_for_padding(srp_context_t srp_ctx, int len) {
     int modulus_size = mbedtls_mpi_size(srp_ctx->N);
     return len < modulus_size ? modulus_size : len;
@@ -900,7 +899,7 @@ int srp_init(const unsigned char *crypto_seed, int crypto_seed_len) {
 
 srp_context_t srp_new_client(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         errno = SRP_ERR_NOT_INITIALIZED;
         return NULL;
     }
@@ -915,7 +914,7 @@ cleanup:
 
 srp_context_t srp_new_server(SRP_TYPE type, SRP_CRYPTO_HASH_ALGORITHM halg) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         errno = SRP_ERR_NOT_INITIALIZED;
         return NULL;
     }
@@ -945,7 +944,7 @@ cleanup:
 
 mbedtls_mpi *srp_get_salt(srp_context_t srp_ctx) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         errno = SRP_ERR_NOT_INITIALIZED;
         return NULL;
     }
@@ -954,7 +953,7 @@ mbedtls_mpi *srp_get_salt(srp_context_t srp_ctx) {
 
 mbedtls_mpi *srp_get_public_key(srp_context_t srp_ctx) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         errno = SRP_ERR_NOT_INITIALIZED;
         return NULL;
     }
@@ -963,7 +962,7 @@ mbedtls_mpi *srp_get_public_key(srp_context_t srp_ctx) {
 
 mbedtls_mpi *srp_get_session_secret(srp_context_t srp_ctx) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         errno = SRP_ERR_NOT_INITIALIZED;
         return NULL;
     }
@@ -972,7 +971,7 @@ mbedtls_mpi *srp_get_session_secret(srp_context_t srp_ctx) {
 
 mbedtls_mpi *srp_get_verify_key(srp_context_t srp_ctx) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         errno = SRP_ERR_NOT_INITIALIZED;
         return NULL;
     }
@@ -990,7 +989,7 @@ mbedtls_mpi *srp_get_verify_key(srp_context_t srp_ctx) {
 int srp_set_params(srp_context_t srp_ctx, mbedtls_mpi *modulus, mbedtls_mpi *generator, mbedtls_mpi *salt) {
     int ret = SRP_ERR_OK;
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         return SRP_ERR_NOT_INITIALIZED;
     }
     if (modulus) {
@@ -1010,7 +1009,7 @@ cleanup:
 int srp_set_username(srp_context_t srp_ctx, const char *username) {
     int ret;
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         return SRP_ERR_NOT_INITIALIZED;
     }
     srp_context_set_username(srp_ctx, username);
@@ -1023,7 +1022,7 @@ cleanup:
 int srp_set_auth_password(srp_context_t srp_ctx, const unsigned char *password, int password_len) {
     int ret;
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         return SRP_ERR_NOT_INITIALIZED;
     }
     if (!srp_ctx->username || !srp_ctx->s) {
@@ -1049,7 +1048,7 @@ cleanup:
 
 int srp_gen_pub(srp_context_t srp_ctx) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         return SRP_ERR_NOT_INITIALIZED;
     }
     if (srp_ctx->role == SRP_ROLE_SERVER) {
@@ -1063,7 +1062,7 @@ int srp_gen_pub(srp_context_t srp_ctx) {
 
 int srp_compute_key(srp_context_t srp_ctx, mbedtls_mpi *public_key) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         return SRP_ERR_NOT_INITIALIZED;
     }
     if (srp_ctx->role == SRP_ROLE_SERVER) {
@@ -1077,7 +1076,7 @@ int srp_compute_key(srp_context_t srp_ctx, mbedtls_mpi *public_key) {
 
 int srp_verify_key(srp_context_t srp_ctx, mbedtls_mpi *M) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         return SRP_ERR_NOT_INITIALIZED;
     }
     if (srp_ctx->role == SRP_ROLE_SERVER) {
@@ -1091,7 +1090,7 @@ int srp_verify_key(srp_context_t srp_ctx, mbedtls_mpi *M) {
 
 void srp_free(void *s) {
     if (!RR) {
-        ESP_LOGD(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
+        ESP_LOGI(TAG, "SRP not initialized! Please call srp_init() before using SRP functions");
         return;
     }
     srp_context_free((srp_context_t)s);
