@@ -993,7 +993,7 @@ int srp_set_params(srp_context_t srp_ctx, mbedtls_mpi *modulus, mbedtls_mpi *gen
         return SRP_ERR_NOT_INITIALIZED;
     }
     if (modulus) {
-        srp_context_set_N(srp_ctx, generator);
+        srp_context_set_N(srp_ctx, modulus);
     }
     if (generator) {
         srp_context_set_g(srp_ctx, generator);
